@@ -57,6 +57,36 @@
     </div>
 
     <div class="bg-container rounded-xl shadow-border-xs p-4">
+      <div class="mb-4 rounded-xl bg-container-inset p-4">
+        <p class="text-sm font-medium text-primary mb-3"><%= t("recurring_transactions.manual_form.title") %></p>
+        <%= styled_form_with url: recurring_transactions_path, scope: :recurring_transaction, class: "grid grid-cols-1 lg:grid-cols-6 gap-3" do |form| %>
+          <div class="lg:col-span-2">
+            <%= form.text_field :name,
+                                label: t("recurring_transactions.manual_form.name"),
+                                placeholder: t("recurring_transactions.manual_form.name_placeholder"),
+                                required: true %>
+          </div>
+          <%= form.money_field :amount,
+                               label: t("recurring_transactions.manual_form.amount"),
+                               default_currency: Current.family.currency,
+                               required: true %>
+          <%= form.select :account_id,
+                          @accounts.map { |account| [ account.name, account.id ] },
+                          { label: t("recurring_transactions.manual_form.account") },
+                          required: true %>
+          <%= form.number_field :expected_day_of_month,
+                                label: t("recurring_transactions.manual_form.expected_day"),
+                                min: 1,
+                                max: 31,
+                                value: Date.current.day,
+                                required: true %>
+          <%= form.hidden_field :currency, value: Current.family.currency %>
+          <div class="flex items-end justify-end">
+            <%= form.submit t("recurring_transactions.manual_form.add") %>
+          </div>
+        <% end %>
+      </div>
+
       <% if @recurring_transactions.empty? %>
         <%= render DS::EmptyState.new(
           icon: "repeat",

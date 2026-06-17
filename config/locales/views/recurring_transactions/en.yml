@@ -1,7 +1,17 @@
 ---
 en:
   recurring_transactions:
+    create:
+      success: Recurring payment created
     title: Recurring Transactions
+    manual_form:
+      account: Account
+      add: Add recurring
+      amount: Amount
+      expected_day: Day
+      name: Name
+      name_placeholder: Rent, insurance, subscription
+      title: Add manual recurring payment
     upcoming: Upcoming Recurring Transactions
     projected: Projected
     recurring: Recurring
