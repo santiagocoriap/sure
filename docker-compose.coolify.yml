@@ -1,0 +1,117 @@
+# ===========================================================================
+# Coolify deployment for a self-hosted Sure fork
+# ===========================================================================
+#
+# Build pack:  Docker Compose
+# Compose file location (in Coolify): /docker-compose.coolify.yml
+#
+# This builds the `web` and `worker` images from THIS repo's Dockerfile (so your
+# own changes ship), and runs Postgres + Redis alongside them.
+#
+# Coolify "magic" variables (auto-generated and persisted by Coolify):
+#   SERVICE_FQDN_WEB_3000        -> your public domain, routed to web:3000
+#   SERVICE_PASSWORD_POSTGRES    -> the Postgres password (shared by app + db)
+#   SERVICE_BASE64_64_SECRETKEYBASE -> Rails SECRET_KEY_BASE
+# If your Coolify version doesn't recognise a magic variable, just set
+# SECRET_KEY_BASE (openssl rand -hex 64) and the DB password manually in the UI.
+#
+# Optional env you can add in the Coolify UI:
+#   OPENAI_ACCESS_TOKEN  -> enables AI features (incurs OpenAI cost)
+#   APP_DOMAIN           -> host used in outgoing email links (e.g. sure.example.com)
+#   SMTP_ADDRESS / SMTP_PORT / SMTP_USERNAME / SMTP_PASSWORD / SMTP_TLS_ENABLED
+# ===========================================================================
+
+x-app-image: &app-image
+  build:
+    context: .
+    dockerfile: Dockerfile
+  image: sure-self-hosted:latest
+
+x-app-env: &app-env
+  SELF_HOSTED: "true"
+  RAILS_ENV: "production"
+  # TLS is terminated by Coolify's reverse proxy. Trust it (so links/cookies use
+  # https) but let the proxy handle the http->https redirect. Once your domain
+  # has a working certificate you can flip RAILS_FORCE_SSL to "true".
+  RAILS_ASSUME_SSL: "true"
+  RAILS_FORCE_SSL: "false"
+  DB_HOST: postgres
+  DB_PORT: "5432"
+  POSTGRES_USER: sure
+  POSTGRES_DB: sure_production
+  POSTGRES_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
+  REDIS_URL: redis://redis:6379/1
+  SECRET_KEY_BASE: ${SERVICE_BASE64_64_SECRETKEYBASE}
+  OPENAI_ACCESS_TOKEN: ${OPENAI_ACCESS_TOKEN:-}
+  APP_DOMAIN: ${APP_DOMAIN:-}
+
+services:
+  web:
+    <<: *app-image
+    command: ./bin/rails server -b 0.0.0.0
+    environment:
+      <<: *app-env
+      # Presence of this variable tells Coolify to expose this service publicly
+      # and route the generated domain to container port 3000.
+      SERVICE_FQDN_WEB_3000: ""
+    expose:
+      - "3000"
+    volumes:
+      - app-storage:/rails/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -fsS http://localhost:3000/up || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+
+  worker:
+    <<: *app-image
+    command: bundle exec sidekiq
+    environment:
+      <<: *app-env
+    volumes:
+      - app-storage:/rails/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: sure
+      POSTGRES_DB: sure_production
+      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U sure -d sure_production" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  app-storage:
+  postgres-data:
+  redis-data:
