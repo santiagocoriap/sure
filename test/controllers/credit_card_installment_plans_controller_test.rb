@@ -38,27 +38,24 @@ class CreditCardInstallmentPlansControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to account_path(@account, tab: "installments")
   end
 
-  test "post_next posts the next installment as an activity entry" do
+  test "post_next marks the next installment paid" do
     plan = credit_card_installment_plans(:iphone)
-    plan.update!(installments_count: 3, paid_installments: 0, first_payment_on: Date.current >> 6)
-    plan.installment_transactions.each { |t| t.entry.destroy! }
+    plan.update!(installments_count: 3, paid_installments: 1)
 
-    assert_difference "plan.account.entries.count", 1 do
-      post post_next_credit_card_installment_plan_path(plan)
-    end
+    post post_next_credit_card_installment_plan_path(plan)
+
+    assert_equal 2, plan.reload.paid_installments
     assert_redirected_to account_path(plan.account, tab: "installments")
-    assert_equal 1, plan.reload.paid_installments
   end
 
-  test "unpost_last removes the most recent installment entry" do
+  test "unpost_last unmarks the last paid installment" do
     plan = credit_card_installment_plans(:iphone)
-    plan.update!(installments_count: 3, paid_installments: 0, first_payment_on: Date.current >> 6)
-    plan.installment_transactions.each { |t| t.entry.destroy! }
-    plan.post_next_installment!
+    plan.update!(installments_count: 3, paid_installments: 2)
 
-    assert_difference "plan.account.entries.count", -1 do
-      delete unpost_last_credit_card_installment_plan_path(plan)
-    end
+    delete unpost_last_credit_card_installment_plan_path(plan)
+
+    assert_equal 1, plan.reload.paid_installments
+    assert_redirected_to account_path(plan.account, tab: "installments")
   end
 
   test "installments tab renders with the schedule and override controls" do

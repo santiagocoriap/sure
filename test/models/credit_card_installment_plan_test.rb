@@ -56,53 +56,38 @@ class CreditCardInstallmentPlanTest < ActiveSupport::TestCase
     assert_equal Date.new(2026, 5, 9), plan.payment_on_for(3)
   end
 
-  test "post_due_installments! posts only installments due on or before the cutoff and is idempotent" do
+  test "post_full_purchase! creates one full-amount charge linked to the plan" do
     plan = credit_card_installment_plans(:iphone)
-    plan.update!(installments_count: 3, paid_installments: 0, first_payment_on: Date.new(2026, 1, 9))
-    plan.installment_transactions.each { |t| t.entry.destroy! }
-
-    cutoff = Date.new(2026, 2, 28)
-    assert_difference "plan.account.entries.count", 2 do
-      plan.post_due_installments!(through: cutoff)
-    end
-    assert_no_difference "plan.account.entries.count" do
-      plan.post_due_installments!(through: cutoff)
-    end
-
-    numbers = plan.reload.installment_transactions.pluck(:installment_number).sort
-    assert_equal [ 1, 2 ], numbers
-    assert_equal 2, plan.paid_installments
-
-    entry = plan.installment_transactions.order(:installment_number).first.entry
-    assert_equal plan.monthly_amount, entry.amount
-    assert_equal "#{plan.name} (1/3)", entry.name
-    assert_equal Date.new(2026, 1, 9), entry.date
-  end
-
-  test "post_next_installment! posts the next installment dated today" do
-    plan = credit_card_installment_plans(:iphone)
-    plan.update!(installments_count: 3, paid_installments: 0, first_payment_on: Date.current >> 6)
-    plan.installment_transactions.each { |t| t.entry.destroy! }
+    plan.charge_transactions.each { |t| t.entry.destroy! }
 
     assert_difference "plan.account.entries.count", 1 do
-      plan.post_next_installment!
+      plan.post_full_purchase!(date: Date.current, name: plan.name)
     end
-    entry = plan.reload.installment_transactions.sole.entry
-    assert_equal 1, entry.entryable.installment_number
-    assert_equal Date.current, entry.date
-    assert_equal 1, plan.paid_installments
+
+    txn = plan.reload.charge_transactions.sole
+    assert_nil txn.installment_number
+    assert_equal plan.total_amount, txn.entry.amount
+    assert_equal Date.current, txn.entry.date
   end
 
-  test "unpost_last_installment! removes the most recent posted installment" do
+  test "mark_next_installment_paid! bumps the counter and caps at the total" do
     plan = credit_card_installment_plans(:iphone)
-    plan.update!(installments_count: 3, paid_installments: 0, first_payment_on: Date.current >> 6)
-    plan.installment_transactions.each { |t| t.entry.destroy! }
-    plan.post_next_installment!
-    plan.post_next_installment!
+    plan.update!(installments_count: 3, paid_installments: 2)
 
-    assert_difference "plan.account.entries.count", -1 do
-      plan.unpost_last_installment!
-    end
-    assert_equal 1, plan.reload.paid_installments
+    plan.mark_next_installment_paid!
+    assert_equal 3, plan.reload.paid_installments
+    assert plan.completed?
+
+    plan.mark_next_installment_paid! # already at max — no-op
+    assert_equal 3, plan.reload.paid_installments
+  end
+
+  test "unmark_last_installment_paid! decrements and reactivates a completed plan" do
+    plan = credit_card_installment_plans(:iphone)
+    plan.update!(installments_count: 3, paid_installments: 3, status: "completed")
+
+    plan.unmark_last_installment_paid!
+    assert_equal 2, plan.reload.paid_installments
+    assert plan.active?
   end
 end

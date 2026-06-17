@@ -4,8 +4,7 @@ class CreditCardInstallmentPlan < ApplicationRecord
   belongs_to :family
   belongs_to :account
 
-  has_many :installment_transactions,
-           -> { where.not(installment_number: nil) },
+  has_many :charge_transactions,
            class_name: "Transaction",
            foreign_key: :credit_card_installment_plan_id,
            inverse_of: :credit_card_installment_plan
@@ -77,44 +76,40 @@ class CreditCardInstallmentPlan < ApplicationRecord
     (first_due >> (sequence - 1)) - 1
   end
 
-  def next_unposted_sequence
-    posted = posted_installment_numbers
-    (1..installments_count).find { |seq| posted.exclude?(seq) }
+  # Posts the full purchase as a single credit card charge linked to this plan,
+  # so it hits the activity feed and the card's debt immediately (like any other
+  # purchase). The plan then only tracks the monthly payoff schedule.
+  def post_full_purchase!(date:, name:, category_id: nil)
+    entry = account.entries.create!(
+      name: name,
+      date: date,
+      amount: total_amount, # positive = outflow on a liability (Sure convention)
+      currency: currency,
+      entryable: Transaction.new(
+        category_id: category_id,
+        credit_card_installment_plan_id: id
+      )
+    )
+    entry.lock_saved_attributes!
+    entry.mark_user_modified!
+    entry.sync_account_later
+    entry
   end
 
-  def post_due_installments!(through: Date.current)
-    return unless active?
+  # Manual payoff tracking: bump the count of installments the user has paid.
+  def mark_next_installment_paid!
+    return if paid_installments >= installments_count
 
-    posted = posted_installment_numbers
-    (1..installments_count).each do |seq|
-      next if posted.include?(seq)
-      date = payment_on_for(seq)
-      next if date > through
-
-      create_installment_entry!(seq, date)
-    end
-
-    recalc_paid_installments!
+    update!(paid_installments: paid_installments + 1)
     mark_completed_if_paid!
   end
 
-  def post_next_installment!
-    seq = next_unposted_sequence
-    return if seq.nil?
+  def unmark_last_installment_paid!
+    return if paid_installments <= 0
 
-    create_installment_entry!(seq, Date.current)
-    recalc_paid_installments!
-    mark_completed_if_paid!
-  end
-
-  def unpost_last_installment!
-    last = Transaction.where(credit_card_installment_plan_id: id).where.not(installment_number: nil).order(:installment_number).last
-    return if last.nil?
-
-    last.entry.destroy!
-    reload
-    recalc_paid_installments!
-    update!(status: "active") if completed?
+    was_completed = completed?
+    update!(paid_installments: paid_installments - 1)
+    update!(status: "active") if was_completed
   end
 
   private
@@ -143,36 +138,10 @@ class CreditCardInstallmentPlan < ApplicationRecord
       errors.add(:account, "must belong to the same family")
     end
 
-    def posted_installment_numbers
-      Transaction.where(credit_card_installment_plan_id: id).where.not(installment_number: nil).pluck(:installment_number)
-    end
-
-    def create_installment_entry!(sequence, date)
-      entry = account.entries.create!(
-        name: "#{name} (#{sequence}/#{installments_count})",
-        date: date,
-        amount: monthly_amount, # positive = outflow on a liability (Sure convention)
-        currency: currency,
-        entryable: Transaction.new(
-          category_id: category_id,
-          credit_card_installment_plan_id: id,
-          installment_number: sequence
-        )
-      )
-      entry.lock_saved_attributes!
-      entry.mark_user_modified!
-      entry.sync_account_later
-      entry
-    end
-
-    def recalc_paid_installments!
-      update_column(:paid_installments, posted_installment_numbers.size)
-    end
-
     def destroy_installment_entries
       Entry.where(
         entryable_type: "Transaction",
-        entryable_id: installment_transactions.select(:id)
+        entryable_id: charge_transactions.select(:id)
       ).destroy_all
     end
 end

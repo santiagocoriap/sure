@@ -23,12 +23,12 @@ class CreditCardInstallmentPlansController < ApplicationController
   end
 
   def post_next
-    @plan.post_next_installment!
+    @plan.mark_next_installment_paid!
     redirect_to account_path(@plan.account, tab: "installments"), notice: t("credit_card_installment_plans.post_next.success")
   end
 
   def unpost_last
-    @plan.unpost_last_installment!
+    @plan.unmark_last_installment_paid!
     redirect_to account_path(@plan.account, tab: "installments"), notice: t("credit_card_installment_plans.unpost_last.success")
   end
 

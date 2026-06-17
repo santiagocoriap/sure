@@ -722,11 +722,11 @@ end
     assert_nil created_entry.transaction.extra["exchange_rate"]
   end
 
-  test "creating a credit card transaction with installments builds a plan and no lump entry" do
+  test "creating a credit card transaction with installments builds a plan and posts the full charge" do
     card_account = accounts(:credit_card)
 
     assert_difference "CreditCardInstallmentPlan.count", 1 do
-      assert_no_difference -> { card_account.entries.where("name NOT LIKE ?", "%/%").count } do
+      assert_difference "card_account.entries.count", 1 do
         post transactions_path, params: {
           entry: {
             account_id: card_account.id,
@@ -747,6 +747,11 @@ end
     assert_equal 12, plan.installments_count
     assert_equal 1200, plan.total_amount
     assert_equal Date.current, plan.purchased_on
+
+    # The full purchase is posted as one charge linked to the plan
+    charge = plan.charge_transactions.sole
+    assert_equal 1200, charge.entry.amount
+    assert_equal Date.current, charge.entry.date
   end
 
   test "installments of 1 creates a normal transaction" do
