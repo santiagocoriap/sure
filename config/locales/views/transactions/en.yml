@@ -29,6 +29,8 @@ en:
       account: Account
       account_prompt: Select an Account
       amount: Amount
+      installments: "Installments"
+      installments_hint: "For credit cards: split this purchase into monthly installments (1 = no split)."
       category: Category
       category_label: Category
       category_prompt: Select a Category
@@ -48,6 +50,8 @@ en:
       transfer: Transfer
     create:
       created: Transaction created
+      installment_default_name: "Installment purchase"
+      installment_plan_created: "Installment plan created"
     update:
       updated: Transaction updated
     new:

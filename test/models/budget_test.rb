@@ -453,4 +453,25 @@ class BudgetTest < ActiveSupport::TestCase
     # Other Investments synthetic categories previously caused this to return 0
     assert spending >= 75, "Uncategorized actual spending should include the $75 transaction, got #{spending}"
   end
+
+  test "scheduled expense commitments include credit card and recurring payments" do
+    family = families(:dylan_family)
+    budget = Budget.find_or_bootstrap(family, start_date: Date.current)
+    budget.update!(budgeted_spending: 1000, currency: "USD")
+
+    family.recurring_transactions.create!(
+      account: accounts(:depository),
+      name: "Insurance",
+      amount: 80,
+      currency: "USD",
+      expected_day_of_month: Date.current.day,
+      last_occurrence_date: 1.month.ago.to_date,
+      next_expected_date: Date.current,
+      manual: true
+    )
+
+    assert_operator budget.scheduled_expense_commitments, :>=, 280
+    assert_equal budget.budgeted_spending - budget.allocated_spending - budget.scheduled_expense_commitments,
+                 budget.available_to_allocate
+  end
 end

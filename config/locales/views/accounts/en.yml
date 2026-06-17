@@ -74,6 +74,7 @@ en:
       tabs:
         activity: Activity
         holdings: Holdings
+        installments: Installments
         overview: Overview
         statements: Statements
       activity:

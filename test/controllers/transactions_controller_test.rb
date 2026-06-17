@@ -722,6 +722,49 @@ end
     assert_nil created_entry.transaction.extra["exchange_rate"]
   end
 
+  test "creating a credit card transaction with installments builds a plan and no lump entry" do
+    card_account = accounts(:credit_card)
+
+    assert_difference "CreditCardInstallmentPlan.count", 1 do
+      assert_no_difference -> { card_account.entries.where("name NOT LIKE ?", "%/%").count } do
+        post transactions_path, params: {
+          entry: {
+            account_id: card_account.id,
+            name: "Laptop",
+            amount: 1200,
+            currency: "USD",
+            date: Date.current.to_s,
+            nature: "outflow",
+            installments: 12,
+            entryable_type: "Transaction",
+            entryable_attributes: { category_id: "" }
+          }
+        }
+      end
+    end
+
+    plan = CreditCardInstallmentPlan.order(:created_at).last
+    assert_equal 12, plan.installments_count
+    assert_equal 1200, plan.total_amount
+    assert_equal Date.current, plan.purchased_on
+  end
+
+  test "installments of 1 creates a normal transaction" do
+    card_account = accounts(:credit_card)
+
+    assert_no_difference "CreditCardInstallmentPlan.count" do
+      assert_difference "card_account.entries.count", 1 do
+        post transactions_path, params: {
+          entry: {
+            account_id: card_account.id, name: "Coffee", amount: 5, currency: "USD",
+            date: Date.current.to_s, nature: "outflow", installments: 1,
+            entryable_type: "Transaction", entryable_attributes: { category_id: "" }
+          }
+        }
+      end
+    end
+  end
+
   private
     def rendered_entry_ids
       css_select("turbo-frame[id^='entry_']").map { |node| node["id"].delete_prefix("entry_") }

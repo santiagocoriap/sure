@@ -1,0 +1,13 @@
+---
+en:
+  credit_card_installment_plans:
+    create:
+      success: Installment plan created
+    destroy:
+      success: Installment plan deleted
+    update:
+      success: Installment plan updated
+    post_next:
+      success: "Installment posted"
+    unpost_last:
+      success: "Installment removed"

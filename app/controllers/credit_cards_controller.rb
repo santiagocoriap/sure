@@ -4,6 +4,9 @@ class CreditCardsController < ApplicationController
   permitted_accountable_attributes(
     :id,
     :available_credit,
+    :credit_limit,
+    :closing_day,
+    :due_day,
     :minimum_payment,
     :apr,
     :annual_fee,

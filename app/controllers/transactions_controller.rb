@@ -100,6 +100,11 @@ class TransactionsController < ApplicationController
 
     return unless require_account_permission!(account)
 
+    installments = params.dig(:entry, :installments).to_i
+    if account.credit_card? && installments > 1
+      return create_installment_plan(account, installments)
+    end
+
     @entry = account.entries.new(entry_params)
 
     if @entry.save
@@ -409,6 +414,39 @@ class TransactionsController < ApplicationController
   end
 
   private
+    def create_installment_plan(account, installments)
+      ep = entry_params
+      purchase_date = (ep[:date].presence || Date.current).to_date
+      amount = ep[:amount].to_d.abs
+
+      plan = account.credit_card_installment_plans.new(
+        family: Current.family,
+        name: ep[:name].presence || t("transactions.create.installment_default_name"),
+        total_amount: amount,
+        currency: ep[:currency].presence || account.currency,
+        installments_count: installments,
+        paid_installments: 0,
+        purchased_on: purchase_date,
+        first_payment_on: account.credit_card.installment_first_payment_on(purchase_date),
+        category_id: ep.dig(:entryable_attributes, :category_id).presence,
+        status: "active"
+      )
+
+      if plan.save
+        plan.post_due_installments!
+        flash[:notice] = t("transactions.create.installment_plan_created")
+        respond_to do |format|
+          format.html { redirect_back_or_to account_path(account) }
+          format.turbo_stream { stream_redirect_back_or_to(account_path(account)) }
+        end
+      else
+        set_new_transaction_form_options
+        @entry = account.entries.new(entry_params)
+        flash.now[:alert] = plan.errors.full_messages.to_sentence
+        render :new, status: :unprocessable_entity
+      end
+    end
+
     def accessible_transactions
       Current.family.transactions
         .joins(entry: :account)

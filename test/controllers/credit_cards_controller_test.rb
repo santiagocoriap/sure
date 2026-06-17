@@ -6,6 +6,7 @@ class CreditCardsControllerTest < ActionDispatch::IntegrationTest
   setup do
     sign_in @user = users(:family_admin)
     @account = accounts(:credit_card)
+    ensure_tailwind_build
   end
 
   test "creates with credit card details" do
@@ -24,6 +25,9 @@ class CreditCardsControllerTest < ActionDispatch::IntegrationTest
           accountable_type: "CreditCard",
           accountable_attributes: {
             available_credit: 5000,
+            credit_limit: 7000,
+            closing_day: 25,
+            due_day: 10,
             minimum_payment: 25.51,
             apr: 15.99,
             expiration_date: 2.years.from_now.to_date,
@@ -42,6 +46,9 @@ class CreditCardsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "americanexpress.com", created_account[:institution_domain]
     assert_equal "Primary card", created_account[:notes]
     assert_equal 5000, created_account.accountable.available_credit
+    assert_equal 7000, created_account.accountable.credit_limit
+    assert_equal 25, created_account.accountable.closing_day
+    assert_equal 10, created_account.accountable.due_day
     assert_equal 25.51, created_account.accountable.minimum_payment
     assert_equal 15.99, created_account.accountable.apr
     assert_equal 2.years.from_now.to_date, created_account.accountable.expiration_date
@@ -66,6 +73,9 @@ class CreditCardsControllerTest < ActionDispatch::IntegrationTest
           accountable_attributes: {
             id: @account.accountable_id,
             available_credit: 6000,
+            credit_limit: 8000,
+            closing_day: 20,
+            due_day: 5,
             minimum_payment: 50,
             apr: 14.99,
             expiration_date: 3.years.from_now.to_date,
@@ -83,6 +93,9 @@ class CreditCardsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "chase.com", @account[:institution_domain]
     assert_equal "Updated notes", @account[:notes]
     assert_equal 6000, @account.accountable.available_credit
+    assert_equal 8000, @account.accountable.credit_limit
+    assert_equal 20, @account.accountable.closing_day
+    assert_equal 5, @account.accountable.due_day
     assert_equal 50, @account.accountable.minimum_payment
     assert_equal 14.99, @account.accountable.apr
     assert_equal 3.years.from_now.to_date, @account.accountable.expiration_date
