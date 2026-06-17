@@ -21,11 +21,12 @@
 #   SMTP_ADDRESS / SMTP_PORT / SMTP_USERNAME / SMTP_PASSWORD / SMTP_TLS_ENABLED
 # ===========================================================================
 
+# The image is built by GitHub Actions (.github/workflows/coolify-image.yml) and
+# pulled here — your VPS never builds it. APP_IMAGE defaults to the branch you
+# deploy; override it in the Coolify UI to pin a different tag/digest.
 x-app-image: &app-image
-  build:
-    context: .
-    dockerfile: Dockerfile
-  image: sure-self-hosted:latest
+  image: ${APP_IMAGE:-ghcr.io/santiagocoriap/sure:installments-integration}
+  pull_policy: always
 
 x-app-env: &app-env
   SELF_HOSTED: "true"
