@@ -23,6 +23,8 @@ en:
       earned: "%{amount} earned"
       over: "%{amount} over"
       left: "%{amount} left"
+      scheduled_commitments: "Scheduled commitments"
+      scheduled_commitments_description: "Credit card minimums, installment plans, and manual recurring expenses are reserved automatically."
       spent: "%{amount} spent"
     edit:
       setup_title: "Setup your budget"

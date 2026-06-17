@@ -1,11 +1,12 @@
 class UI::AccountPage < ApplicationComponent
   attr_reader :account, :chart_view, :chart_period, :statement_coverage, :statements, :reconciliation_statuses,
-              :can_manage_statements
+              :can_manage_statements, :credit_card_installment_plans, :credit_card_budget
 
   renders_one :activity_feed, ->(feed_data:, pagy:, search:) { UI::Account::ActivityFeed.new(feed_data: feed_data, pagy: pagy, search: search) }
 
   def initialize(account:, chart_view: nil, chart_period: nil, active_tab: nil, statement_coverage: nil, statements: [],
-                 reconciliation_statuses: {}, can_manage_statements: false)
+                 reconciliation_statuses: {}, can_manage_statements: false, credit_card_installment_plans: nil,
+                 credit_card_budget: nil)
     @account = account
     @chart_view = chart_view
     @chart_period = chart_period
@@ -14,6 +15,8 @@ class UI::AccountPage < ApplicationComponent
     @statements = statements
     @reconciliation_statuses = reconciliation_statuses
     @can_manage_statements = can_manage_statements
+    @credit_card_installment_plans = credit_card_installment_plans || []
+    @credit_card_budget = credit_card_budget
   end
 
   def id
@@ -48,6 +51,8 @@ class UI::AccountPage < ApplicationComponent
       [ :activity, :holdings ]
     when "Property", "Vehicle", "Loan"
       [ :activity, :overview ]
+    when "CreditCard"
+      [ :activity, :installments ]
     else
       [ :activity ]
     end
@@ -81,6 +86,11 @@ class UI::AccountPage < ApplicationComponent
       render "#{account.accountable_type.downcase.pluralize}/tabs/#{tab}", account: account
     when :statements
       render_statement_tab
+    when :installments
+      render "credit_cards/tabs/installments",
+        account: account,
+        plans: credit_card_installment_plans,
+        budget: credit_card_budget
     end
   end
 

@@ -1,5 +1,8 @@
 one:
   available_credit: 5000.00
+  credit_limit: 6000.00
+  closing_day: 25
+  due_day: 10
   minimum_payment: 100.00
   apr: 18.99
   expiration_date: <%= 4.years.from_now.to_date %>

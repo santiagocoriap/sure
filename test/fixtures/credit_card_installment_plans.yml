@@ -1,0 +1,11 @@
+iphone:
+  family: dylan_family
+  account: credit_card
+  name: iPhone 15 Pro
+  total_amount: 1200
+  currency: USD
+  installments_count: 12
+  paid_installments: 3
+  first_payment_on: <%= 3.months.ago.beginning_of_month.to_date %>
+  purchased_on: <%= 4.months.ago.beginning_of_month.to_date %>
+  status: active

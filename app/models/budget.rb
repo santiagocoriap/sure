@@ -14,7 +14,9 @@ class Budget < ApplicationRecord
 
   monetize :budgeted_spending, :expected_income, :allocated_spending,
            :actual_spending, :available_to_spend, :available_to_allocate,
-           :estimated_spending, :estimated_income, :actual_income, :remaining_expected_income
+           :estimated_spending, :estimated_income, :actual_income, :remaining_expected_income,
+           :scheduled_expense_commitments, :scheduled_credit_card_minimum_payments,
+           :scheduled_installment_payments, :scheduled_recurring_expenses
 
   class << self
     def date_to_param(date)
@@ -244,7 +246,7 @@ class Budget < ApplicationRecord
   end
 
   def available_to_spend
-    (budgeted_spending || 0) - actual_spending
+    (budgeted_spending || 0) - actual_spending - scheduled_expense_commitments
   end
 
   def percent_of_budget_spent
@@ -266,14 +268,55 @@ class Budget < ApplicationRecord
     budget_categories.reject { |bc| bc.subcategory? }.sum(&:budgeted_spending)
   end
 
+  def scheduled_expense_commitments
+    scheduled_credit_card_minimum_payments + scheduled_installment_payments + scheduled_recurring_expenses
+  end
+
+  def scheduled_credit_card_minimum_payments
+    family.accounts
+      .active
+      .where(accountable_type: "CreditCard", currency: currency)
+      .includes(:accountable)
+      .sum do |account|
+        card = account.accountable
+        next 0.to_d if card.minimum_payment.blank?
+        next 0.to_d if card.payment_due_on_for(period).blank?
+
+        card.minimum_payment
+      end
+  end
+
+  def scheduled_installment_payments
+    family.credit_card_installment_plans
+      .active
+      .where(currency: currency)
+      .includes(:account)
+      .sum do |plan|
+        plan.payment_dates_between(start_date, end_date).sum { plan.monthly_amount }
+      end
+  end
+
+  def scheduled_recurring_expenses
+    family.recurring_transactions
+      .active
+      .where(currency: currency)
+      .sum do |recurring|
+        next 0.to_d unless recurring.next_expected_date.between?(start_date, end_date)
+        amount = recurring.expected_amount_avg.presence || recurring.amount
+        next 0.to_d unless amount.positive?
+
+        amount
+      end
+  end
+
   def allocated_percent
     return 0 unless budgeted_spending && budgeted_spending > 0
 
-    (allocated_spending / budgeted_spending.to_f) * 100
+    ((allocated_spending + scheduled_expense_commitments) / budgeted_spending.to_f) * 100
   end
 
   def available_to_allocate
-    (budgeted_spending || 0) - allocated_spending
+    (budgeted_spending || 0) - allocated_spending - scheduled_expense_commitments
   end
 
   def allocations_valid?

@@ -10,9 +10,53 @@ en:
       apr_placeholder: '15.99'
       available_credit: Available credit
       available_credit_placeholder: '10000'
+      closing_day: Closing day
+      closing_day_placeholder: '25'
+      credit_limit: Credit limit
+      credit_limit_placeholder: '10000'
+      due_day: Due day
+      due_day_placeholder: '10'
       expiration_date: Expiration date
       minimum_payment: Minimum payment
       minimum_payment_placeholder: '100'
+    installments:
+      active_plans:
+        one: "across 1 active plan"
+        other: "across %{count} active plans"
+      active_title: Active plans
+      available_credit: Available
+      budgeted_this_month: Budgeted this month
+      card_usage: Card usage
+      card_usage_description: Closing and due dates are used to place monthly card payments into the budget period.
+      closing_date: Closing date
+      confirm_delete: Delete this installment plan?
+      day_monthly: "%{day} monthly"
+      delete: Delete
+      due_date: Due date
+      empty: No installment plans yet.
+      form:
+        add: Add plan
+        first_payment_on: First payment
+        installments_count: Installments
+        name: Name
+        name_placeholder: iPhone 15 Pro
+        paid_installments: Paid
+        total_amount: Total amount
+      includes_recurring: Includes card minimums, installments, and recurring payments.
+      mark_next_paid: Mark next paid
+      next_due: "Next payment due %{date}"
+      unmark_last: "Undo last"
+      monthly: Monthly
+      monthly_burden: Monthly burden
+      new_plan: New installment plan
+      payment_number: "Payment %{current} of %{total}"
+      plan_progress: "%{paid} of %{total} installments paid"
+      remaining: Remaining
+      remaining_liability: Remaining liability
+      still_to_pay: still to be paid
+      total: Total
+      unknown: Unknown
+      utilized: Utilized
     new:
       title: Enter credit card details
     overview:

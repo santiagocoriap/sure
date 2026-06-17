@@ -51,6 +51,7 @@ class AccountsController < ApplicationController
     @chart_view = params[:chart_view] || "balance"
     @tab = params[:tab]
     @q = params.fetch(:q, {}).permit(:search, status: [])
+    build_credit_card_tab_data if @account.credit_card?
     entries = @account.entries.where(excluded: false).search(@q).reverse_chronological.includes(:entryable)
     if statement_tab_active?
       build_statement_tab_data
@@ -252,6 +253,11 @@ class AccountsController < ApplicationController
       permission = @account.permission_for(Current.user)
       @can_manage_statements = AccountStatement.statement_manager?(Current.user) &&
         permission.in?([ :owner, :full_control ])
+    end
+
+    def build_credit_card_tab_data
+      @credit_card_installment_plans = @account.credit_card_installment_plans.ordered.to_a
+      @credit_card_budget = Budget.find_or_bootstrap(Current.family, start_date: Date.current, user: Current.user)
     end
 
     def statement_tab_frame_request?

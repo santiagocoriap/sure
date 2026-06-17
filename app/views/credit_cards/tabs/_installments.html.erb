@@ -1,0 +1,167 @@
+<%# locals: (account:, plans:, budget:) %>
+<% card = account.accountable %>
+<% active_plans = plans.select(&:active?) %>
+<% monthly_burden = active_plans.sum(&:monthly_amount) %>
+<% remaining_liability = active_plans.sum(&:remaining_amount) %>
+<% paid_to_date = active_plans.sum(&:paid_amount) %>
+<% utilization = card.utilization_percent %>
+<% can_manage = account.permission_for(Current.user).in?([ :owner, :full_control ]) %>
+
+<div class="space-y-4">
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
+    <div class="bg-container rounded-xl shadow-border-xs p-4">
+      <p class="text-xs text-secondary"><%= t("credit_cards.installments.monthly_burden") %></p>
+      <p class="text-xl font-semibold privacy-sensitive"><%= format_money(Money.new(monthly_burden, account.currency)) %></p>
+      <p class="text-xs text-secondary"><%= t("credit_cards.installments.active_plans", count: active_plans.count) %></p>
+    </div>
+    <div class="bg-container rounded-xl shadow-border-xs p-4">
+      <p class="text-xs text-secondary"><%= t("credit_cards.installments.remaining_liability") %></p>
+      <p class="text-xl font-semibold privacy-sensitive"><%= format_money(Money.new(remaining_liability, account.currency)) %></p>
+      <p class="text-xs text-secondary"><%= t("credit_cards.installments.still_to_pay") %></p>
+    </div>
+    <div class="bg-container rounded-xl shadow-border-xs p-4">
+      <p class="text-xs text-secondary"><%= t("credit_cards.installments.budgeted_this_month") %></p>
+      <p class="text-xl font-semibold privacy-sensitive"><%= format_money(Money.new(budget&.scheduled_expense_commitments || 0, account.currency)) %></p>
+      <p class="text-xs text-secondary"><%= t("credit_cards.installments.includes_recurring") %></p>
+    </div>
+  </div>
+
+  <div class="bg-container rounded-xl shadow-border-xs p-4">
+    <div class="grid grid-cols-1 lg:grid-cols-5 gap-4 lg:items-end">
+      <div class="lg:col-span-2">
+        <p class="text-sm font-medium text-primary"><%= t("credit_cards.installments.card_usage") %></p>
+        <p class="text-xs text-secondary"><%= t("credit_cards.installments.card_usage_description") %></p>
+      </div>
+      <div>
+        <p class="text-xs text-secondary"><%= t("credit_cards.installments.available_credit") %></p>
+        <p class="font-medium privacy-sensitive">
+          <% if card.available_credit_amount.present? %>
+            <%= format_money(Money.new(card.available_credit_amount, account.currency)) %>
+          <% else %>
+            <%= t("credit_cards.installments.unknown") %>
+          <% end %>
+        </p>
+      </div>
+      <div>
+        <p class="text-xs text-secondary"><%= t("credit_cards.installments.closing_date") %></p>
+        <p class="font-medium"><%= card.closing_day.present? ? t("credit_cards.installments.day_monthly", day: card.closing_day.ordinalize) : t("credit_cards.installments.unknown") %></p>
+      </div>
+      <div>
+        <p class="text-xs text-secondary"><%= t("credit_cards.installments.due_date") %></p>
+        <p class="font-medium"><%= card.due_day.present? ? t("credit_cards.installments.day_monthly", day: card.due_day.ordinalize) : t("credit_cards.installments.unknown") %></p>
+      </div>
+    </div>
+
+    <div class="mt-4">
+      <div class="flex items-center justify-between text-xs text-secondary mb-1">
+        <span><%= t("credit_cards.installments.utilized") %></span>
+        <span><%= utilization.present? ? number_to_percentage(utilization, precision: 0) : t("credit_cards.installments.unknown") %></span>
+      </div>
+      <div class="h-2 rounded-full bg-container-inset overflow-hidden">
+        <div class="h-full rounded-full bg-warning" style="width: <%= utilization || 0 %>%"></div>
+      </div>
+    </div>
+  </div>
+
+  <% if can_manage %>
+    <div class="bg-container rounded-xl shadow-border-xs p-4">
+      <p class="text-sm font-medium text-primary mb-3"><%= t("credit_cards.installments.new_plan") %></p>
+      <%= styled_form_with url: credit_card_installment_plans_path, scope: :credit_card_installment_plan, class: "grid grid-cols-1 lg:grid-cols-6 gap-3" do |form| %>
+        <%= form.hidden_field :account_id, value: account.id %>
+        <div class="lg:col-span-2">
+          <%= form.text_field :name, label: t("credit_cards.installments.form.name"), placeholder: t("credit_cards.installments.form.name_placeholder"), required: true %>
+        </div>
+        <%= form.money_field :total_amount, label: t("credit_cards.installments.form.total_amount"), default_currency: account.currency, required: true %>
+        <%= form.number_field :installments_count, label: t("credit_cards.installments.form.installments_count"), min: 1, required: true %>
+        <%= form.number_field :paid_installments, label: t("credit_cards.installments.form.paid_installments"), min: 0, value: 0 %>
+        <%= form.date_field :first_payment_on, label: t("credit_cards.installments.form.first_payment_on"), value: Date.current.beginning_of_month, required: true %>
+        <div class="lg:col-span-6 flex justify-end">
+          <%= form.submit t("credit_cards.installments.form.add") %>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+
+  <div class="rounded-xl bg-container-inset space-y-1 p-1">
+    <div class="flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-secondary uppercase">
+      <p><%= t("credit_cards.installments.active_title") %></p>
+      <span class="text-subdued">&middot;</span>
+      <p><%= active_plans.count %></p>
+    </div>
+
+    <div class="bg-container rounded-lg shadow-border-xs">
+      <% if plans.any? %>
+        <div class="divide-y divide-subdued">
+          <% plans.each do |plan| %>
+            <div class="p-4">
+              <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div class="min-w-0">
+                  <div class="flex items-center gap-2">
+                    <%= render DS::FilledIcon.new(variant: :text, text: plan.name, size: "sm") %>
+                    <div>
+                      <p class="font-medium text-primary"><%= plan.name %></p>
+                      <p class="text-xs text-secondary"><%= t("credit_cards.installments.plan_progress", paid: plan.paid_installments, total: plan.installments_count) %></p>
+                    </div>
+                  </div>
+                </div>
+                <div class="grid grid-cols-3 gap-4 text-right">
+                  <div>
+                    <p class="text-xs text-secondary"><%= t("credit_cards.installments.monthly") %></p>
+                    <p class="text-sm font-medium privacy-sensitive"><%= format_money(plan.monthly_amount_money) %></p>
+                  </div>
+                  <div>
+                    <p class="text-xs text-secondary"><%= t("credit_cards.installments.remaining") %></p>
+                    <p class="text-sm font-medium privacy-sensitive"><%= format_money(Money.new(plan.remaining_amount, plan.currency)) %></p>
+                  </div>
+                  <div>
+                    <p class="text-xs text-secondary"><%= t("credit_cards.installments.total") %></p>
+                    <p class="text-sm font-medium privacy-sensitive"><%= format_money(plan.total_amount_money) %></p>
+                  </div>
+                </div>
+              </div>
+              <div class="mt-3">
+                <div class="flex items-center justify-between text-xs text-secondary mb-1">
+                  <span><%= t("credit_cards.installments.payment_number", current: plan.paid_installments, total: plan.installments_count) %></span>
+                  <span><%= number_to_percentage(plan.progress_percent, precision: 0) %></span>
+                </div>
+                <div class="h-1.5 rounded-full bg-container-inset overflow-hidden">
+                  <div class="h-full rounded-full bg-success" style="width: <%= plan.progress_percent %>%"></div>
+                </div>
+              </div>
+              <% upcoming_seq = plan.paid_installments + 1 %>
+              <% if plan.paid_installments < plan.installments_count %>
+                <p class="mt-3 text-xs text-secondary">
+                  <%= t("credit_cards.installments.next_due",
+                        date: l(plan.payment_on_for(upcoming_seq), format: :short)) %>
+                </p>
+              <% end %>
+              <% if can_manage %>
+                <div class="mt-3 flex justify-end gap-2">
+                  <% if plan.paid_installments < plan.installments_count %>
+                    <%= button_to t("credit_cards.installments.mark_next_paid"),
+                                  post_next_credit_card_installment_plan_path(plan),
+                                  method: :post,
+                                  class: "text-sm font-medium text-primary hover:text-primary-hover" %>
+                  <% end %>
+                  <% if plan.paid_installments.positive? %>
+                    <%= button_to t("credit_cards.installments.unmark_last"),
+                                  unpost_last_credit_card_installment_plan_path(plan),
+                                  method: :delete,
+                                  class: "text-sm font-medium text-secondary hover:text-primary" %>
+                  <% end %>
+                  <%= button_to t("credit_cards.installments.delete"),
+                                credit_card_installment_plan_path(plan),
+                                method: :delete,
+                                data: { turbo_confirm: t("credit_cards.installments.confirm_delete") },
+                                class: "text-sm font-medium text-destructive" %>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+      <% else %>
+        <p class="text-sm text-secondary text-center py-8 font-medium"><%= t("credit_cards.installments.empty") %></p>
+      <% end %>
+    </div>
+  </div>
+</div>
