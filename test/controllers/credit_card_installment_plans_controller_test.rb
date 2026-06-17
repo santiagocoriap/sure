@@ -6,16 +6,16 @@ class CreditCardInstallmentPlansControllerTest < ActionDispatch::IntegrationTest
     @account = accounts(:credit_card)
   end
 
-  test "creates an installment plan" do
-    assert_difference "CreditCardInstallmentPlan.count", 1 do
+  test "creates an installment plan and posts the remaining balance as a charge" do
+    assert_difference [ "CreditCardInstallmentPlan.count", "@account.entries.count" ], 1 do
       post credit_card_installment_plans_path, params: {
         credit_card_installment_plan: {
           account_id: @account.id,
           name: "Notebook",
           total_amount: 1800,
           installments_count: 18,
-          paid_installments: 0,
-          first_payment_on: Date.current
+          paid_installments: 6,
+          first_payment_on: 6.months.ago.to_date
         }
       }
     end
@@ -24,6 +24,11 @@ class CreditCardInstallmentPlansControllerTest < ActionDispatch::IntegrationTest
     assert_equal @account, plan.account
     assert_equal @account.family, plan.family
     assert_equal "USD", plan.currency
+
+    # 1800 total / 18 = 100 monthly; 6 already paid -> 1200 still owed
+    charge = plan.charge_transactions.sole
+    assert_equal 1200, charge.entry.amount
+    assert_equal Date.current, charge.entry.date
     assert_redirected_to account_path(@account, tab: "installments")
   end
 

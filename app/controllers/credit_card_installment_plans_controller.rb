@@ -6,7 +6,12 @@ class CreditCardInstallmentPlansController < ApplicationController
     @plan = @account.credit_card_installment_plans.build(plan_params)
     @plan.family = Current.family
     @plan.currency = @account.currency
-    @plan.save!
+
+    ActiveRecord::Base.transaction do
+      @plan.save!
+      # Track the purchase in the activity feed as its still-owed balance.
+      @plan.post_outstanding_charge!(date: Date.current, name: @plan.name, category_id: @plan.category_id)
+    end
 
     redirect_to account_path(@account, tab: "installments"), notice: t("credit_card_installment_plans.create.success")
   rescue ActiveRecord::RecordInvalid

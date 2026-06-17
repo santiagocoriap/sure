@@ -76,14 +76,18 @@ class CreditCardInstallmentPlan < ApplicationRecord
     (first_due >> (sequence - 1)) - 1
   end
 
-  # Posts the full purchase as a single credit card charge linked to this plan,
-  # so it hits the activity feed and the card's debt immediately (like any other
-  # purchase). The plan then only tracks the monthly payoff schedule.
-  def post_full_purchase!(date:, name:, category_id: nil)
+  # Posts the outstanding (still-unpaid) balance of this plan as a single credit
+  # card charge linked to the plan, so the purchase shows in the activity feed and
+  # the card's debt reflects what is actually still owed. For a brand-new purchase
+  # nothing is paid yet, so this is the full amount; for a partly-paid purchase it
+  # is total minus what has already been paid. Returns nil when nothing is owed.
+  def post_outstanding_charge!(date:, name:, category_id: nil)
+    return if remaining_amount <= 0
+
     entry = account.entries.create!(
       name: name,
       date: date,
-      amount: total_amount, # positive = outflow on a liability (Sure convention)
+      amount: remaining_amount, # positive = outflow on a liability (Sure convention)
       currency: currency,
       entryable: Transaction.new(
         category_id: category_id,
