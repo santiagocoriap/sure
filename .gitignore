@@ -131,3 +131,6 @@ logs/security/
 # Ignore Playwright artifacts
 playwright-report/
 .playwright-mcp
+
+# Local database backups (may contain sensitive data)
+.local_backups/
