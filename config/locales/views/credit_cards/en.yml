@@ -30,12 +30,16 @@ en:
       card_usage_description: Closing and due dates are used to place monthly card payments into the budget period.
       closing_date: Closing date
       confirm_delete: Delete this installment plan?
+      cycle_row: "Closes %{closing} · Due %{due}"
       day_monthly: "%{day} monthly"
       delete: Delete
       due_date: Due date
       empty: No installment plans yet.
       form:
         add: Add plan
+        add_cycle: Add override
+        closing_on: Closing date
+        due_on: Due date
         first_payment_on: First payment
         installments_count: Installments
         name: Name
@@ -44,6 +48,8 @@ en:
         payment_account: Paid from
         payment_account_blank: "Don't track payments"
         total_amount: Total amount
+      statement_dates: Statement dates
+      statement_dates_description: Override the closing and due dates for any month that differs from the usual days.
       due_this_month: Installments due this month
       due_this_month_description:
         one: 1 installment is due across your plans

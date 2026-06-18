@@ -430,6 +430,8 @@ Rails.application.routes.draw do
     end
   end
 
+  resources :credit_card_billing_cycles, only: %i[create destroy]
+
   resources :accountable_sparklines, only: :show, param: :accountable_type
 
   direct :entry do |entry, options|

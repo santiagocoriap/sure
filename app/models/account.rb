@@ -26,6 +26,7 @@ class Account < ApplicationRecord
   has_many :balances, dependent: :destroy
   has_many :recurring_transactions, dependent: :destroy
   has_many :credit_card_installment_plans, dependent: :destroy
+  has_many :credit_card_billing_cycles, dependent: :destroy
   has_many :goal_accounts, dependent: :destroy
   has_many :goals, through: :goal_accounts
   has_many :goal_pledges, dependent: :destroy

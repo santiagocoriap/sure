@@ -1,0 +1,7 @@
+---
+en:
+  credit_card_billing_cycles:
+    create:
+      success: Statement dates saved
+    destroy:
+      success: Statement dates removed

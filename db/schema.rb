@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_17_050000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_17_060000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -488,6 +488,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_17_050000) do
     t.index ["family_id", "exchange_portfolio_id"], name: "index_coinstats_items_on_family_id_and_exchange_portfolio_id", unique: true, where: "(exchange_portfolio_id IS NOT NULL)"
     t.index ["family_id"], name: "index_coinstats_items_on_family_id"
     t.index ["status"], name: "index_coinstats_items_on_status"
+  end
+
+  create_table "credit_card_billing_cycles", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "account_id", null: false
+    t.date "closing_on", null: false
+    t.datetime "created_at", null: false
+    t.date "due_on", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "closing_on"], name: "idx_unique_cc_billing_cycle_close", unique: true
+    t.index ["account_id"], name: "index_credit_card_billing_cycles_on_account_id"
   end
 
   create_table "credit_card_installment_plans", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -2110,6 +2120,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_17_050000) do
   add_foreign_key "coinbase_items", "families"
   add_foreign_key "coinstats_accounts", "coinstats_items"
   add_foreign_key "coinstats_items", "families"
+  add_foreign_key "credit_card_billing_cycles", "accounts", on_delete: :cascade
   add_foreign_key "credit_card_installment_plans", "accounts", column: "payment_account_id", on_delete: :nullify
   add_foreign_key "credit_card_installment_plans", "accounts", on_delete: :cascade
   add_foreign_key "credit_card_installment_plans", "categories", on_delete: :nullify

@@ -1,4 +1,4 @@
-<%# locals: (account:, plans:, budget:, payment_accounts: []) %>
+<%# locals: (account:, plans:, budget:, payment_accounts: [], billing_cycles: []) %>
 <% card = account.accountable %>
 <% active_plans = plans.select(&:active?) %>
 <% monthly_burden = active_plans.sum(&:monthly_amount) %>
@@ -78,6 +78,39 @@
       </div>
     </div>
   </div>
+
+  <% if can_manage %>
+    <div class="bg-container rounded-xl shadow-border-xs p-4">
+      <p class="text-sm font-medium text-primary"><%= t("credit_cards.installments.statement_dates") %></p>
+      <p class="text-xs text-secondary mb-3"><%= t("credit_cards.installments.statement_dates_description") %></p>
+
+      <% if billing_cycles.any? %>
+        <div class="divide-y divide-subdued mb-3">
+          <% billing_cycles.each do |cycle| %>
+            <div class="flex items-center justify-between py-2 text-sm">
+              <span class="text-primary">
+                <%= t("credit_cards.installments.cycle_row",
+                      closing: l(cycle.closing_on, format: :short), due: l(cycle.due_on, format: :short)) %>
+              </span>
+              <%= button_to t("credit_cards.installments.delete"),
+                            credit_card_billing_cycle_path(cycle),
+                            method: :delete,
+                            class: "text-sm font-medium text-destructive" %>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+
+      <%= styled_form_with url: credit_card_billing_cycles_path, scope: :credit_card_billing_cycle, class: "grid grid-cols-1 lg:grid-cols-3 gap-3 lg:items-end" do |form| %>
+        <%= form.hidden_field :account_id, value: account.id %>
+        <%= form.date_field :closing_on, label: t("credit_cards.installments.form.closing_on"), required: true %>
+        <%= form.date_field :due_on, label: t("credit_cards.installments.form.due_on"), required: true %>
+        <div class="flex justify-end">
+          <%= form.submit t("credit_cards.installments.form.add_cycle") %>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
 
   <% if can_manage %>
     <div class="bg-container rounded-xl shadow-border-xs p-4">

@@ -91,7 +91,8 @@ class UI::AccountPage < ApplicationComponent
         account: account,
         plans: credit_card_installment_plans,
         budget: credit_card_budget,
-        payment_accounts: payment_accounts
+        payment_accounts: payment_accounts,
+        billing_cycles: account.credit_card_billing_cycles.ordered
     end
   end
 

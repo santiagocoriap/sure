@@ -52,26 +52,81 @@ class CreditCard < ApplicationRecord
   end
 
   def payment_due_on_for(period)
+    override = billing_cycle_due_in(period)
+    return override.due_on if override
+
     cycle_date_for(due_day, period)
   end
 
   def closing_on_for(period)
+    override = billing_cycle_closing_in_period(period)
+    return override.closing_on if override
+
     cycle_date_for(closing_day, period)
+  end
+
+  # The actual closing date for the month containing `date` (a per-month override
+  # if one exists, otherwise the default closing day).
+  def closing_on_in_month(date)
+    cycle = billing_cycle_closing_in_month(date)
+    return cycle.closing_on if cycle
+    return nil if closing_day.blank?
+
+    day_in_month(closing_day, date)
+  end
+
+  # The actual payment due date for the month containing `date`.
+  def due_on_in_month(date)
+    cycle = billing_cycle_due_in(date)
+    return cycle.due_on if cycle
+    return nil if due_day.blank?
+
+    day_in_month(due_day, date)
   end
 
   # First installment payment date for a purchase made on `purchase_date`.
   # Posts the day before the due date, in the cycle AFTER the statement the
-  # purchase closes in. Falls back to the first of next month when the card
-  # has no cycle days configured.
+  # purchase closes in. Per-month billing-cycle overrides take precedence over
+  # the default closing/due days. Falls back to the first of next month when the
+  # card has no cycle days configured.
   def installment_first_payment_on(purchase_date)
     return purchase_date.next_month.beginning_of_month if closing_day.blank? || due_day.blank?
 
-    next_close = next_day_occurrence(closing_day, on_or_after: purchase_date)
-    due_date   = day_in_month(due_day, next_close.next_month)
-    due_date - 1
+    month = purchase_date.beginning_of_month
+    loop do
+      cycle = billing_cycle_closing_in_month(month)
+      close = cycle&.closing_on || day_in_month(closing_day, month)
+
+      if close >= purchase_date
+        due = cycle&.due_on || day_in_month(due_day, close.next_month)
+        return due - 1
+      end
+
+      month = month.next_month
+    end
   end
 
   private
+    def billing_cycles
+      @billing_cycles ||= (account&.credit_card_billing_cycles&.to_a || [])
+    end
+
+    def billing_cycle_closing_in_month(date)
+      billing_cycles.find { |c| c.closing_on.beginning_of_month == date.beginning_of_month }
+    end
+
+    def billing_cycle_due_in(period)
+      period_start = period.respond_to?(:start_date) ? period.start_date : (period.respond_to?(:first) ? period.first : period.beginning_of_month)
+      period_end = period.respond_to?(:end_date) ? period.end_date : (period.respond_to?(:last) ? period.last : period.end_of_month)
+      billing_cycles.find { |c| c.due_on >= period_start && c.due_on <= period_end }
+    end
+
+    def billing_cycle_closing_in_period(period)
+      period_start = period.respond_to?(:start_date) ? period.start_date : period.first
+      period_end = period.respond_to?(:end_date) ? period.end_date : period.last
+      billing_cycles.find { |c| c.closing_on >= period_start && c.closing_on <= period_end }
+    end
+
     def next_day_occurrence(day, on_or_after:)
       candidate = day_in_month(day, on_or_after)
       candidate >= on_or_after ? candidate : day_in_month(day, on_or_after.next_month)
