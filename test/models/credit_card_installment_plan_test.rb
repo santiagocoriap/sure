@@ -18,7 +18,8 @@ class CreditCardInstallmentPlanTest < ActiveSupport::TestCase
 
     dates = @plan.payment_dates_between(period_start, period_end)
 
-    assert_equal [ period_start ], dates
+    assert_equal 1, dates.size
+    assert (period_start..period_end).cover?(dates.first), "the payment date should fall inside the period"
   end
 
   test "payment_dates_between aligns with payment_on_for (day before due, not raw first_payment_on)" do
@@ -49,11 +50,27 @@ class CreditCardInstallmentPlanTest < ActiveSupport::TestCase
     assert_includes plan.errors[:account], "must be a credit card"
   end
 
-  test "payment_on_for advances one month per installment, day before due" do
+  test "payment_on_for falls back to the plan anchor when the card has no due day" do
     plan = CreditCardInstallmentPlan.new(first_payment_on: Date.new(2026, 3, 9))
     assert_equal Date.new(2026, 3, 9), plan.payment_on_for(1)
     assert_equal Date.new(2026, 4, 9), plan.payment_on_for(2)
     assert_equal Date.new(2026, 5, 9), plan.payment_on_for(3)
+  end
+
+  test "payment_on_for uses the card's due date and per-month override for each installment" do
+    account = accounts(:credit_card)
+    account.credit_card.update!(closing_day: 27, due_day: 10)
+    # July is overridden to be due the 13th; other months use the default due day (10th)
+    account.credit_card_billing_cycles.create!(closing_on: Date.new(2026, 7, 2), due_on: Date.new(2026, 7, 13))
+
+    plan = account.credit_card_installment_plans.create!(
+      name: "TV", total_amount: 600, installments_count: 6, paid_installments: 0,
+      first_payment_on: Date.new(2026, 7, 1), purchased_on: Date.new(2026, 6, 20)
+    )
+    plan = CreditCardInstallmentPlan.find(plan.id)
+
+    assert_equal Date.new(2026, 7, 13), plan.payment_on_for(1), "July installment should use the override due date"
+    assert_equal Date.new(2026, 8, 10), plan.payment_on_for(2), "August should use the default due day"
   end
 
   test "post_remaining_installments! posts one monthly charge per unpaid installment, on schedule" do

@@ -73,9 +73,14 @@ class CreditCardInstallmentPlan < ApplicationRecord
     update!(status: "completed") if remaining_installments.zero? && active?
   end
 
+  # The due date for installment `sequence`. Uses the card's actual due date for
+  # that installment's month — a per-month billing-cycle override when one exists,
+  # otherwise the card's default due day — so every plan lines up with the card's
+  # real due dates. Falls back to the plan's own anchor when the card has no due
+  # day configured.
   def payment_on_for(sequence)
-    first_due = first_payment_on + 1
-    (first_due >> (sequence - 1)) - 1
+    nominal_due = (first_payment_on + 1) >> (sequence - 1)
+    account&.credit_card&.due_on_in_month(nominal_due) || (nominal_due - 1)
   end
 
   # Posts one credit card charge per still-unpaid installment — each for the
