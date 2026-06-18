@@ -41,6 +41,8 @@ en:
         name: Name
         name_placeholder: iPhone 15 Pro
         paid_installments: Paid
+        payment_account: Paid from
+        payment_account_blank: "Don't track payments"
         total_amount: Total amount
       includes_recurring: Includes card minimums, installments, and recurring payments.
       mark_next_paid: Mark next paid

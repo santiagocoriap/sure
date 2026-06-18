@@ -3,6 +3,8 @@ class CreditCardInstallmentPlan < ApplicationRecord
 
   belongs_to :family
   belongs_to :account
+  # Bank/asset account that installment payments are drawn from (optional).
+  belongs_to :payment_account, class_name: "Account", optional: true
 
   has_many :charge_transactions,
            class_name: "Transaction",
@@ -24,7 +26,7 @@ class CreditCardInstallmentPlan < ApplicationRecord
   scope :ordered, -> { order(status: :asc, first_payment_on: :asc, created_at: :desc) }
 
   before_validation :assign_family_and_currency
-  before_destroy :destroy_installment_entries
+  before_destroy :destroy_linked_transactions
 
   def monthly_amount
     return 0.to_d if installments_count.to_i.zero?
@@ -89,20 +91,29 @@ class CreditCardInstallmentPlan < ApplicationRecord
     end
   end
 
-  # Manual payoff tracking: bump the count of installments the user has paid.
+  # Marks the next installment paid: records the payment (a transfer from the
+  # chosen bank account to the card, so net worth stays correct) and advances the
+  # paid counter.
   def mark_next_installment_paid!
     return if paid_installments >= installments_count
 
-    update!(paid_installments: paid_installments + 1)
-    mark_completed_if_paid!
+    ActiveRecord::Base.transaction do
+      create_installment_payment!
+      update!(paid_installments: paid_installments + 1)
+      mark_completed_if_paid!
+    end
   end
 
+  # Reverses the most recent installment payment and steps the counter back.
   def unmark_last_installment_paid!
     return if paid_installments <= 0
 
-    was_completed = completed?
-    update!(paid_installments: paid_installments - 1)
-    update!(status: "active") if was_completed
+    ActiveRecord::Base.transaction do
+      remove_payment!(installment_payments.order(:created_at).last)
+      was_completed = completed?
+      update!(paid_installments: paid_installments - 1)
+      update!(status: "active") if was_completed
+    end
   end
 
   private
@@ -131,6 +142,61 @@ class CreditCardInstallmentPlan < ApplicationRecord
       errors.add(:account, "must belong to the same family")
     end
 
+    # Linked transactions split into the monthly purchase charges (which carry an
+    # installment_number) and the payments toward them (which do not).
+    def installment_charges
+      charge_transactions.where.not(installment_number: nil)
+    end
+
+    def installment_payments
+      charge_transactions.where(installment_number: nil)
+    end
+
+    # Records one installment payment. With a payment account set this is a proper
+    # transfer (bank balance down, card debt down — net-worth neutral); without
+    # one it falls back to a one-sided cc_payment that just lowers the card debt.
+    def create_installment_payment!
+      return if monthly_amount <= 0
+
+      if payment_account.present?
+        transfer = Transfer::Creator.new(
+          family: family,
+          source_account_id: payment_account_id,
+          destination_account_id: account_id,
+          date: Date.current,
+          amount: monthly_amount
+        ).create
+        # Tag the card side of the transfer so we can find/undo it later.
+        transfer.inflow_transaction.update!(credit_card_installment_plan_id: id)
+      else
+        entry = account.entries.create!(
+          name: "Payment - #{name}",
+          date: Date.current,
+          amount: -monthly_amount, # negative on a liability = debt decreases
+          currency: currency,
+          entryable: Transaction.new(kind: "cc_payment", credit_card_installment_plan_id: id)
+        )
+        entry.lock_saved_attributes!
+        entry.mark_user_modified!
+        entry.sync_account_later
+      end
+    end
+
+    def remove_payment!(payment)
+      return if payment.nil?
+
+      transfer = payment.transfer_as_inflow
+      if transfer
+        bank_entry = transfer.outflow_transaction.entry
+        card_entry = transfer.inflow_transaction.entry
+        transfer.destroy!
+        bank_entry.destroy!
+        card_entry.destroy!
+      else
+        payment.entry.destroy!
+      end
+    end
+
     def posted_installment_numbers
       Transaction.where(credit_card_installment_plan_id: id).where.not(installment_number: nil).pluck(:installment_number)
     end
@@ -153,10 +219,11 @@ class CreditCardInstallmentPlan < ApplicationRecord
       entry
     end
 
-    def destroy_installment_entries
+    def destroy_linked_transactions
+      installment_payments.to_a.each { |payment| remove_payment!(payment) }
       Entry.where(
         entryable_type: "Transaction",
-        entryable_id: charge_transactions.select(:id)
+        entryable_id: installment_charges.select(:id)
       ).destroy_all
     end
 end

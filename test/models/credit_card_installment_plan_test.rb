@@ -106,4 +106,45 @@ class CreditCardInstallmentPlanTest < ActiveSupport::TestCase
     assert_equal 2, plan.reload.paid_installments
     assert plan.active?
   end
+
+  test "marking paid with a payment account records a transfer from bank to card" do
+    plan = credit_card_installment_plans(:iphone)
+    plan.update!(installments_count: 3, paid_installments: 0, payment_account: accounts(:depository))
+
+    assert_difference -> { Transfer.count }, 1 do
+      plan.mark_next_installment_paid!
+    end
+
+    payment = plan.reload.charge_transactions.where(installment_number: nil).sole
+    transfer = payment.transfer_as_inflow
+    assert_not_nil transfer
+    assert_equal accounts(:depository), transfer.outflow_transaction.entry.account
+    assert_equal plan.account, transfer.inflow_transaction.entry.account
+    assert_equal plan.monthly_amount, transfer.outflow_transaction.entry.amount
+    assert_equal 1, plan.paid_installments
+  end
+
+  test "unmarking paid reverses the payment transfer" do
+    plan = credit_card_installment_plans(:iphone)
+    plan.update!(installments_count: 3, paid_installments: 0, payment_account: accounts(:depository))
+    plan.mark_next_installment_paid!
+
+    assert_difference -> { Transfer.count }, -1 do
+      plan.unmark_last_installment_paid!
+    end
+    assert_equal 0, plan.reload.paid_installments
+    assert_equal 0, plan.charge_transactions.where(installment_number: nil).count
+  end
+
+  test "marking paid without a payment account lowers the card debt one-sidedly" do
+    plan = credit_card_installment_plans(:iphone)
+    plan.update!(installments_count: 3, paid_installments: 0, payment_account: nil)
+
+    assert_difference -> { plan.account.entries.count }, 1 do
+      plan.mark_next_installment_paid!
+    end
+    payment = plan.reload.charge_transactions.where(installment_number: nil).sole
+    assert_equal "cc_payment", payment.kind
+    assert_equal(-plan.monthly_amount, payment.entry.amount)
+  end
 end

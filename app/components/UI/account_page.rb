@@ -90,8 +90,14 @@ class UI::AccountPage < ApplicationComponent
       render "credit_cards/tabs/installments",
         account: account,
         plans: credit_card_installment_plans,
-        budget: credit_card_budget
+        budget: credit_card_budget,
+        payment_accounts: payment_accounts
     end
+  end
+
+  # Bank/asset accounts an installment plan can be paid from.
+  def payment_accounts
+    account.family.accounts.visible.where(accountable_type: "Depository").alphabetically
   end
 
   def render_statement_tab

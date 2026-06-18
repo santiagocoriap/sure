@@ -1,4 +1,4 @@
-<%# locals: (account:, plans:, budget:) %>
+<%# locals: (account:, plans:, budget:, payment_accounts: []) %>
 <% card = account.accountable %>
 <% active_plans = plans.select(&:active?) %>
 <% monthly_burden = active_plans.sum(&:monthly_amount) %>
@@ -75,6 +75,13 @@
         <%= form.number_field :installments_count, label: t("credit_cards.installments.form.installments_count"), min: 1, required: true %>
         <%= form.number_field :paid_installments, label: t("credit_cards.installments.form.paid_installments"), min: 0, value: 0 %>
         <%= form.date_field :first_payment_on, label: t("credit_cards.installments.form.first_payment_on"), value: Date.current.beginning_of_month, required: true %>
+        <% if payment_accounts.any? %>
+          <div class="lg:col-span-2">
+            <%= form.collection_select :payment_account_id, payment_accounts, :id, :name,
+                  { include_blank: t("credit_cards.installments.form.payment_account_blank"), label: t("credit_cards.installments.form.payment_account") },
+                  class: "form-field__input" %>
+          </div>
+        <% end %>
         <div class="lg:col-span-6 flex justify-end">
           <%= form.submit t("credit_cards.installments.form.add") %>
         </div>

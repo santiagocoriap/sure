@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_17_040100) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_17_050000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -501,6 +501,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_17_040100) do
     t.string "name", null: false
     t.text "notes"
     t.integer "paid_installments", default: 0, null: false
+    t.uuid "payment_account_id"
     t.date "purchased_on", null: false
     t.string "status", default: "active", null: false
     t.decimal "total_amount", precision: 19, scale: 4, null: false
@@ -510,6 +511,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_17_040100) do
     t.index ["category_id"], name: "index_credit_card_installment_plans_on_category_id"
     t.index ["family_id", "account_id", "status"], name: "idx_on_family_id_account_id_status_b72a40c74d"
     t.index ["family_id"], name: "index_credit_card_installment_plans_on_family_id"
+    t.index ["payment_account_id"], name: "index_credit_card_installment_plans_on_payment_account_id"
     t.check_constraint "installments_count > 0", name: "chk_cc_installment_plans_installments_count"
     t.check_constraint "paid_installments >= 0 AND paid_installments <= installments_count", name: "chk_cc_installment_plans_paid_installments"
     t.check_constraint "status::text = ANY (ARRAY['active'::character varying::text, 'completed'::character varying::text, 'cancelled'::character varying::text])", name: "chk_cc_installment_plans_status"
@@ -2108,6 +2110,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_17_040100) do
   add_foreign_key "coinbase_items", "families"
   add_foreign_key "coinstats_accounts", "coinstats_items"
   add_foreign_key "coinstats_items", "families"
+  add_foreign_key "credit_card_installment_plans", "accounts", column: "payment_account_id", on_delete: :nullify
   add_foreign_key "credit_card_installment_plans", "accounts", on_delete: :cascade
   add_foreign_key "credit_card_installment_plans", "categories", on_delete: :nullify
   add_foreign_key "credit_card_installment_plans", "families"

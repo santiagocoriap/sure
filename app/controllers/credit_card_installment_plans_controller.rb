@@ -68,6 +68,7 @@ class CreditCardInstallmentPlansController < ApplicationController
         :first_payment_on,
         :purchased_on,
         :category_id,
+        :payment_account_id,
         :status,
         :notes
       )
