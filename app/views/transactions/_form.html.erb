@@ -1,4 +1,4 @@
-<%# locals: (entry:, account_currencies:, manual_accounts:, categories:, merchants:, tags:) %>
+<%# locals: (entry:, account_currencies:, manual_accounts:, categories:, merchants:, tags:, payment_accounts: []) %>
 
 <%= styled_form_with model: entry, url: transactions_path, class: "space-y-4", data: { controller: "transaction-form", transaction_form_exchange_rate_url_value: exchange_rate_path, transaction_form_account_currencies_value: account_currencies.to_json } do |f| %>
   <% if entry.errors.any? %>
@@ -33,6 +33,18 @@
       <%= number_field_tag "entry[installments]", 1, min: 1, id: "entry_installments", class: "form-field__input", autocomplete: "off" %>
       <p class="text-xs text-secondary mt-1"><%= t(".installments_hint") %></p>
     </div>
+
+    <% if payment_accounts.any? %>
+      <div class="form-field">
+        <%= label_tag "entry_payment_account_id", t(".payment_account"), class: "form-field__label" %>
+        <%= select_tag "entry[payment_account_id]",
+              options_from_collection_for_select(payment_accounts, :id, :name),
+              include_blank: t(".payment_account_blank"),
+              id: "entry_payment_account_id",
+              class: "form-field__input" %>
+        <p class="text-xs text-secondary mt-1"><%= t(".payment_account_hint") %></p>
+      </div>
+    <% end %>
 
     <%= f.fields_for :entryable do |ef| %>
       <%= ef.collection_select :category_id, categories, :id, :name, { prompt: t(".category_prompt"), label: t(".category"), variant: :badge, searchable: true } %>

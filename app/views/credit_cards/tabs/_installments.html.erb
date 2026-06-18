@@ -6,8 +6,24 @@
 <% paid_to_date = active_plans.sum(&:paid_amount) %>
 <% utilization = card.utilization_percent %>
 <% can_manage = account.permission_for(Current.user).in?([ :owner, :full_control ]) %>
+<% due_count = active_plans.sum(&:installments_due_through) %>
+<% due_amount = active_plans.sum(&:amount_due_through) %>
 
 <div class="space-y-4">
+  <% if can_manage && due_count.positive? %>
+    <div class="bg-container rounded-xl shadow-border-xs p-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div>
+        <p class="text-sm font-medium text-primary"><%= t("credit_cards.installments.due_this_month") %></p>
+        <p class="text-xs text-secondary"><%= t("credit_cards.installments.due_this_month_description", count: due_count) %></p>
+      </div>
+      <%= button_to pay_due_credit_card_installment_plans_path,
+                    params: { credit_card_installment_plan: { account_id: account.id } },
+                    class: "flex items-center gap-2 rounded-lg bg-primary text-inverse px-3 py-2 text-sm font-medium" do %>
+        <%= t("credit_cards.installments.pay_due", amount: format_money(Money.new(due_amount, account.currency))) %>
+      <% end %>
+    </div>
+  <% end %>
+
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
     <div class="bg-container rounded-xl shadow-border-xs p-4">
       <p class="text-xs text-secondary"><%= t("credit_cards.installments.monthly_burden") %></p>

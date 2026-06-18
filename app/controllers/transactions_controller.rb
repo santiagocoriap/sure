@@ -429,6 +429,7 @@ class TransactionsController < ApplicationController
         purchased_on: purchase_date,
         first_payment_on: account.credit_card.installment_first_payment_on(purchase_date),
         category_id: ep.dig(:entryable_attributes, :category_id).presence,
+        payment_account_id: params.dig(:entry, :payment_account_id).presence,
         status: "active"
       )
 
@@ -535,6 +536,11 @@ class TransactionsController < ApplicationController
         .active
         .alphabetically
         .includes(:account_providers, logo_attachment: :blob)
+        .to_a
+      @payment_accounts = accessible_accounts_scope
+        .where(accountable_type: "Depository")
+        .active
+        .alphabetically
         .to_a
       @categories = Current.family.categories.alphabetically.to_a
       @merchants = Current.family.available_merchants_for(Current.user).alphabetically.to_a

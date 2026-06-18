@@ -104,6 +104,26 @@ class CreditCardInstallmentPlan < ApplicationRecord
     end
   end
 
+  # Number of still-unpaid installments whose scheduled date has arrived by
+  # `through` (defaults to the end of the current month).
+  def installments_due_through(through = Date.current.end_of_month)
+    return 0 unless active?
+
+    ((paid_installments + 1)..installments_count).count { |sequence| payment_on_for(sequence) <= through }
+  end
+
+  def amount_due_through(through = Date.current.end_of_month)
+    installments_due_through(through) * monthly_amount
+  end
+
+  # Pays every installment due by `through` in one go (the usual "pay the card"
+  # action), recording a payment for each. Returns how many were paid.
+  def pay_due_installments!(through: Date.current.end_of_month)
+    count = installments_due_through(through)
+    count.times { mark_next_installment_paid! }
+    count
+  end
+
   # Reverses the most recent installment payment and steps the counter back.
   def unmark_last_installment_paid!
     return if paid_installments <= 0

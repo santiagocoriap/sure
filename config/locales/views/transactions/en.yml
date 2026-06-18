@@ -31,6 +31,9 @@ en:
       amount: Amount
       installments: "Installments"
       installments_hint: "For credit cards: split this purchase into monthly installments (1 = no split)."
+      payment_account: "Paid from"
+      payment_account_blank: "Don't track payments"
+      payment_account_hint: "For installment purchases: the account each monthly payment is drawn from."
       category: Category
       category_label: Category
       category_prompt: Select a Category

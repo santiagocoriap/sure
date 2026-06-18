@@ -147,4 +147,26 @@ class CreditCardInstallmentPlanTest < ActiveSupport::TestCase
     assert_equal "cc_payment", payment.kind
     assert_equal(-plan.monthly_amount, payment.entry.amount)
   end
+
+  test "pay_due_installments! pays everything due by the cutoff in one call" do
+    plan = credit_card_installment_plans(:iphone)
+    plan.update!(
+      installments_count: 6,
+      paid_installments: 0,
+      total_amount: 1200,
+      first_payment_on: 2.months.ago.to_date.beginning_of_month,
+      payment_account: accounts(:depository)
+    )
+    plan.charge_transactions.each { |t| t.entry.destroy! }
+
+    due = plan.installments_due_through
+    assert_operator due, :>=, 1, "fixture should have at least one installment due"
+
+    assert_difference -> { Transfer.count }, due do
+      assert_equal due, plan.pay_due_installments!
+    end
+
+    assert_equal due, plan.reload.paid_installments
+    assert_equal 0, plan.installments_due_through, "nothing should remain due after paying"
+  end
 end

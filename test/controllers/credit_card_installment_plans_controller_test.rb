@@ -67,4 +67,24 @@ class CreditCardInstallmentPlansControllerTest < ActionDispatch::IntegrationTest
     get account_path(@account, tab: "installments")
     assert_response :success
   end
+
+  test "pay_due pays this month's installments across the card's plans" do
+    plan = credit_card_installment_plans(:iphone)
+    plan.update!(
+      installments_count: 6,
+      paid_installments: 0,
+      total_amount: 1200,
+      first_payment_on: 2.months.ago.to_date.beginning_of_month,
+      payment_account: accounts(:depository)
+    )
+    due = plan.installments_due_through
+    assert_operator due, :>=, 1
+
+    post pay_due_credit_card_installment_plans_path, params: {
+      credit_card_installment_plan: { account_id: @account.id }
+    }
+
+    assert_equal due, plan.reload.paid_installments
+    assert_redirected_to account_path(@account, tab: "installments")
+  end
 end

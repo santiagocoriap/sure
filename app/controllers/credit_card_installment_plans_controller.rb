@@ -1,5 +1,5 @@
 class CreditCardInstallmentPlansController < ApplicationController
-  before_action :set_account, only: :create
+  before_action :set_account, only: %i[create pay_due]
   before_action :set_plan, only: %i[update destroy post_next unpost_last]
 
   def create
@@ -43,6 +43,13 @@ class CreditCardInstallmentPlansController < ApplicationController
     @plan.destroy!
 
     redirect_to account_path(account, tab: "installments"), notice: t("credit_card_installment_plans.destroy.success")
+  end
+
+  # Pays every installment due this month across all of the card's active plans.
+  def pay_due
+    paid = @account.credit_card_installment_plans.active.sum { |plan| plan.pay_due_installments! }
+
+    redirect_to account_path(@account, tab: "installments"), notice: t("credit_card_installment_plans.pay_due.success", count: paid)
   end
 
   private

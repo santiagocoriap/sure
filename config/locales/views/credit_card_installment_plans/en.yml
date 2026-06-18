@@ -11,3 +11,8 @@ en:
       success: "Installment posted"
     unpost_last:
       success: "Installment removed"
+    pay_due:
+      success:
+        zero: "No installments were due this month"
+        one: "Paid 1 installment due this month"
+        other: "Paid %{count} installments due this month"

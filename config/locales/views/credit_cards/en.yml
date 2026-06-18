@@ -44,8 +44,13 @@ en:
         payment_account: Paid from
         payment_account_blank: "Don't track payments"
         total_amount: Total amount
+      due_this_month: Installments due this month
+      due_this_month_description:
+        one: 1 installment is due across your plans
+        other: "%{count} installments are due across your plans"
       includes_recurring: Includes card minimums, installments, and recurring payments.
       mark_next_paid: Mark next paid
+      pay_due: "Pay %{amount}"
       next_due: "Next payment due %{date}"
       unmark_last: "Undo last"
       monthly: Monthly

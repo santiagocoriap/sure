@@ -421,6 +421,9 @@ Rails.application.routes.draw do
   end
 
   resources :credit_card_installment_plans, only: %i[create update destroy] do
+    collection do
+      post :pay_due
+    end
     member do
       post :post_next
       delete :unpost_last

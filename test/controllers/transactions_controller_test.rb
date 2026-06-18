@@ -754,6 +754,23 @@ end
     assert plan.charge_transactions.all? { |t| t.entry.amount == 100 }
   end
 
+  test "credit card installment plan stores the chosen payment account" do
+    card_account = accounts(:credit_card)
+    bank = accounts(:depository)
+
+    post transactions_path, params: {
+      entry: {
+        account_id: card_account.id, name: "Laptop", amount: 1200, currency: "USD",
+        date: Date.current.to_s, nature: "outflow", installments: 12,
+        payment_account_id: bank.id,
+        entryable_type: "Transaction", entryable_attributes: { category_id: "" }
+      }
+    }
+
+    plan = CreditCardInstallmentPlan.order(:created_at).last
+    assert_equal bank, plan.payment_account
+  end
+
   test "installments of 1 creates a normal transaction" do
     card_account = accounts(:credit_card)
 
