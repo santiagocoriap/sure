@@ -722,11 +722,12 @@ end
     assert_nil created_entry.transaction.extra["exchange_rate"]
   end
 
-  test "creating a credit card transaction with installments builds a plan and posts the full charge" do
+  test "creating a credit card transaction with installments builds a plan and posts monthly charges" do
     card_account = accounts(:credit_card)
 
+    # 1200 / 12 = 100 monthly; a brand-new purchase posts all 12 installments
     assert_difference "CreditCardInstallmentPlan.count", 1 do
-      assert_difference "card_account.entries.count", 1 do
+      assert_difference "card_account.entries.count", 12 do
         post transactions_path, params: {
           entry: {
             account_id: card_account.id,
@@ -748,10 +749,9 @@ end
     assert_equal 1200, plan.total_amount
     assert_equal Date.current, plan.purchased_on
 
-    # The full purchase is posted as one charge linked to the plan
-    charge = plan.charge_transactions.sole
-    assert_equal 1200, charge.entry.amount
-    assert_equal Date.current, charge.entry.date
+    # The purchase is posted as one charge per monthly installment
+    assert_equal (1..12).to_a, plan.charge_transactions.map(&:installment_number).sort
+    assert plan.charge_transactions.all? { |t| t.entry.amount == 100 }
   end
 
   test "installments of 1 creates a normal transaction" do

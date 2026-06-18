@@ -433,7 +433,7 @@ class TransactionsController < ApplicationController
       )
 
       if plan.save
-        plan.post_outstanding_charge!(date: purchase_date, name: plan.name, category_id: plan.category_id)
+        plan.post_remaining_installments!
         flash[:notice] = t("transactions.create.installment_plan_created")
         respond_to do |format|
           format.html { redirect_back_or_to account_path(account) }

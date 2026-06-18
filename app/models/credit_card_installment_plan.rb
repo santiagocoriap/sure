@@ -76,28 +76,17 @@ class CreditCardInstallmentPlan < ApplicationRecord
     (first_due >> (sequence - 1)) - 1
   end
 
-  # Posts the outstanding (still-unpaid) balance of this plan as a single credit
-  # card charge linked to the plan, so the purchase shows in the activity feed and
-  # the card's debt reflects what is actually still owed. For a brand-new purchase
-  # nothing is paid yet, so this is the full amount; for a partly-paid purchase it
-  # is total minus what has already been paid. Returns nil when nothing is owed.
-  def post_outstanding_charge!(date:, name:, category_id: nil)
-    return if remaining_amount <= 0
+  # Posts one credit card charge per still-unpaid installment — each for the
+  # monthly amount, dated on its scheduled payment date — so the spend is spread
+  # across months (correct for budgeting) and shows in the activity feed. Already
+  # paid installments are skipped; idempotent via the unique (plan, number) index.
+  def post_remaining_installments!
+    posted = posted_installment_numbers
+    ((paid_installments + 1)..installments_count).each do |sequence|
+      next if posted.include?(sequence)
 
-    entry = account.entries.create!(
-      name: name,
-      date: date,
-      amount: remaining_amount, # positive = outflow on a liability (Sure convention)
-      currency: currency,
-      entryable: Transaction.new(
-        category_id: category_id,
-        credit_card_installment_plan_id: id
-      )
-    )
-    entry.lock_saved_attributes!
-    entry.mark_user_modified!
-    entry.sync_account_later
-    entry
+      create_installment_entry!(sequence, payment_on_for(sequence))
+    end
   end
 
   # Manual payoff tracking: bump the count of installments the user has paid.
@@ -140,6 +129,28 @@ class CreditCardInstallmentPlan < ApplicationRecord
       return if account.blank? || family.blank? || account.family_id == family_id
 
       errors.add(:account, "must belong to the same family")
+    end
+
+    def posted_installment_numbers
+      Transaction.where(credit_card_installment_plan_id: id).where.not(installment_number: nil).pluck(:installment_number)
+    end
+
+    def create_installment_entry!(sequence, date)
+      entry = account.entries.create!(
+        name: "#{name} (#{sequence}/#{installments_count})",
+        date: date,
+        amount: monthly_amount, # positive = outflow on a liability (Sure convention)
+        currency: currency,
+        entryable: Transaction.new(
+          category_id: category_id,
+          credit_card_installment_plan_id: id,
+          installment_number: sequence
+        )
+      )
+      entry.lock_saved_attributes!
+      entry.mark_user_modified!
+      entry.sync_account_later
+      entry
     end
 
     def destroy_installment_entries

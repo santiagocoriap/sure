@@ -454,7 +454,7 @@ class BudgetTest < ActiveSupport::TestCase
     assert spending >= 75, "Uncategorized actual spending should include the $75 transaction, got #{spending}"
   end
 
-  test "scheduled expense commitments include credit card and recurring payments" do
+  test "scheduled expense commitments include credit card minimum and recurring payments" do
     family = families(:dylan_family)
     budget = Budget.find_or_bootstrap(family, start_date: Date.current)
     budget.update!(budgeted_spending: 1000, currency: "USD")
@@ -470,7 +470,9 @@ class BudgetTest < ActiveSupport::TestCase
       manual: true
     )
 
-    assert_operator budget.scheduled_expense_commitments, :>=, 280
+    # Minimum credit card payment (100) + recurring (80). Installment plans are
+    # now posted as real transactions, so they no longer count as commitments.
+    assert_operator budget.scheduled_expense_commitments, :>=, 180
     assert_equal budget.budgeted_spending - budget.allocated_spending - budget.scheduled_expense_commitments,
                  budget.available_to_allocate
   end

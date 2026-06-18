@@ -56,29 +56,33 @@ class CreditCardInstallmentPlanTest < ActiveSupport::TestCase
     assert_equal Date.new(2026, 5, 9), plan.payment_on_for(3)
   end
 
-  test "post_outstanding_charge! posts the remaining unpaid balance linked to the plan" do
-    # iphone fixture: 1200 total, 12 installments, 3 paid -> 900 remaining
+  test "post_remaining_installments! posts one monthly charge per unpaid installment, on schedule" do
+    # iphone fixture: 1200 total, 12 installments, 3 paid -> 9 remaining of 100 each
     plan = credit_card_installment_plans(:iphone)
     plan.charge_transactions.each { |t| t.entry.destroy! }
 
-    assert_difference "plan.account.entries.count", 1 do
-      plan.post_outstanding_charge!(date: Date.current, name: plan.name)
+    assert_difference "plan.account.entries.count", 9 do
+      plan.post_remaining_installments!
+    end
+    # Idempotent: a second call posts nothing new
+    assert_no_difference "plan.account.entries.count" do
+      plan.post_remaining_installments!
     end
 
-    txn = plan.reload.charge_transactions.sole
-    assert_nil txn.installment_number
-    assert_equal 900, txn.entry.amount
-    assert_equal plan.remaining_amount, txn.entry.amount
-    assert_equal Date.current, txn.entry.date
+    txns = plan.reload.charge_transactions.includes(:entry).sort_by(&:installment_number)
+    assert_equal (4..12).to_a, txns.map(&:installment_number)
+    assert txns.all? { |t| t.entry.amount == plan.monthly_amount }
+    assert_equal plan.payment_on_for(4), txns.first.entry.date
+    assert_equal plan.payment_on_for(12), txns.last.entry.date
   end
 
-  test "post_outstanding_charge! posts nothing when the plan is fully paid" do
+  test "post_remaining_installments! posts nothing when the plan is fully paid" do
     plan = credit_card_installment_plans(:iphone)
     plan.update!(installments_count: 3, paid_installments: 3, status: "completed")
     plan.charge_transactions.each { |t| t.entry.destroy! }
 
     assert_no_difference "plan.account.entries.count" do
-      assert_nil plan.post_outstanding_charge!(date: Date.current, name: plan.name)
+      plan.post_remaining_installments!
     end
   end
 

@@ -16,7 +16,7 @@ class Budget < ApplicationRecord
            :actual_spending, :available_to_spend, :available_to_allocate,
            :estimated_spending, :estimated_income, :actual_income, :remaining_expected_income,
            :scheduled_expense_commitments, :scheduled_credit_card_minimum_payments,
-           :scheduled_installment_payments, :scheduled_recurring_expenses
+           :scheduled_recurring_expenses
 
   class << self
     def date_to_param(date)
@@ -268,8 +268,12 @@ class Budget < ApplicationRecord
     budget_categories.reject { |bc| bc.subcategory? }.sum(&:budgeted_spending)
   end
 
+  # Installment plans are posted as real per-month transactions (see
+  # CreditCardInstallmentPlan#post_remaining_installments!), so each month's
+  # installment already flows through actual_spending. Only minimum payments and
+  # recurring expenses remain as forward-looking commitments here.
   def scheduled_expense_commitments
-    scheduled_credit_card_minimum_payments + scheduled_installment_payments + scheduled_recurring_expenses
+    scheduled_credit_card_minimum_payments + scheduled_recurring_expenses
   end
 
   def scheduled_credit_card_minimum_payments
@@ -283,16 +287,6 @@ class Budget < ApplicationRecord
         next 0.to_d if card.payment_due_on_for(period).blank?
 
         card.minimum_payment
-      end
-  end
-
-  def scheduled_installment_payments
-    family.credit_card_installment_plans
-      .active
-      .where(currency: currency)
-      .includes(:account)
-      .sum do |plan|
-        plan.payment_dates_between(start_date, end_date).sum { plan.monthly_amount }
       end
   end
 

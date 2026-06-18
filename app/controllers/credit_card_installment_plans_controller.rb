@@ -9,8 +9,9 @@ class CreditCardInstallmentPlansController < ApplicationController
 
     ActiveRecord::Base.transaction do
       @plan.save!
-      # Track the purchase in the activity feed as its still-owed balance.
-      @plan.post_outstanding_charge!(date: Date.current, name: @plan.name, category_id: @plan.category_id)
+      # Track the purchase in the activity feed as one charge per remaining
+      # monthly installment (spread across months so budgets stay accurate).
+      @plan.post_remaining_installments!
     end
 
     redirect_to account_path(@account, tab: "installments"), notice: t("credit_card_installment_plans.create.success")
