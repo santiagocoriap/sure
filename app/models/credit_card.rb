@@ -98,7 +98,7 @@ class CreditCard < ApplicationRecord
       close = cycle&.closing_on || day_in_month(closing_day, month)
 
       if close >= purchase_date
-        due = cycle&.due_on || day_in_month(due_day, close.next_month)
+        due = cycle&.due_on || next_due_after(close)
         return due - 1
       end
 
@@ -127,9 +127,13 @@ class CreditCard < ApplicationRecord
       billing_cycles.find { |c| c.closing_on >= period_start && c.closing_on <= period_end }
     end
 
-    def next_day_occurrence(day, on_or_after:)
-      candidate = day_in_month(day, on_or_after)
-      candidate >= on_or_after ? candidate : day_in_month(day, on_or_after.next_month)
+    # The first payment due date strictly after the given closing date. When the
+    # due day falls later in the closing month (e.g. closes the 3rd, due the 13th)
+    # the payment is due that same month; otherwise it rolls to the next month.
+    def next_due_after(close)
+      candidate = day_in_month(due_day, close)
+      candidate = day_in_month(due_day, close.next_month) if candidate <= close
+      candidate
     end
 
     def day_in_month(day, ref_date)
